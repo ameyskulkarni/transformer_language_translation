@@ -129,3 +129,16 @@ class MultiHeadAttentionBlock(nn.Module):
 
         # (Batch, seq_len, d_model) --> (Batch, seq_len, d_model)
         return self.w_o(x)
+
+# Add and norm block
+class ResidualConnection():
+
+    def __init__(self, dropout:float) -> None:
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+        self.norm = LayerNormalization()
+    
+    def forward(self, x, sublayer):
+        # Some implementations first apply the sublayer, then norm. Some apply the norm and then the sublayer.
+        return x + self.dropout(sublayer(self.norm(x)))
+    
