@@ -4,7 +4,7 @@ import math
 
 class InputEmbeddings(nn.Module):
 
-    def __init__(self, d_model: int, vocab_size: int):
+    def __init__(self, d_model: int, vocab_size: int) -> None:
         super().__init__()
         self.d_model = d_model
         self.vocab_size = vocab_size
@@ -46,6 +46,18 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 
+class LayerNormalization(nn.Module):
+
+    def __init__(self, eps:float) -> None:
+        super().__init__()
+        self.eps = eps
+        self.alpha = nn.Parameter(torch.ones(1)) # Learnable parameter that is multiplied
+        self.bias = nn.Parameter(torch.zeros(1)) # Learnable parameter that is added
+
+    def forward(x):
+        mean = x.mean(dim = -1, keepdim=True)
+        std = x.std(dim = -1, keepdim=True)
+        return self.alpha * ((x-mean)/(std+self.eps)) + self.bias
 
 
 
