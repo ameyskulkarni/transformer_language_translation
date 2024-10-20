@@ -25,21 +25,21 @@ class PositionalEncoding(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # create a matrix of length (seq_len, d_model). seq_len is the number of tokens in a sentence and d_model is the number of input embeddings per token.
-        self.pe = torch.zeros(seq_len, d_model)
+        pe = torch.zeros(seq_len, d_model)
 
         # create the numerator and denominator of the positional embedding formula. 
         position = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
 
         # Apply sin and cosine to even and odd positions respectively
-        self.pe[:, 0::2] = torch.sin(position * div_term)
-        self.pe[:, 1::2] = torch.cos(position * div_term)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
 
-        self.pe = pe.unsqueeze(0) # (1, seq_len, d_model)
+        pe = pe.unsqueeze(0) # (1, seq_len, d_model)
 
         # The following only adds the positional encodings to the state dict and does not update these parameters during training. Other such parameters are usually the batch norm statistics like mean and variance. 
         # These are not model parameters and thier requires_grad is False. These are just needed in the model state dict to load data.
-        self.register_buffer('pe', self.pe)
+        self.register_buffer('pe', pe)
 
     def forward(self, x):
         x += self.pe[:, :x.shape[1], :].requires_grad_(False)
@@ -48,16 +48,16 @@ class PositionalEncoding(nn.Module):
 
 class LayerNormalization(nn.Module):
 
-    def __init__(self, eps:float) -> None:
+    def __init__(self, eps:float = 1e-6) -> None:
         super().__init__()
         self.eps = eps
         self.alpha = nn.Parameter(torch.ones(1)) # Learnable parameter that is multiplied
         self.bias = nn.Parameter(torch.zeros(1)) # Learnable parameter that is added
 
-    def forward(x):
+    def forward(self, x):
         mean = x.mean(dim = -1, keepdim=True)
         std = x.std(dim = -1, keepdim=True)
-        return self.alpha * ((x-mean)/(std+self.eps)) + self.bias
+        return (self.alpha * ((x-mean)/(std+self.eps)) + self.bias)
 
 
 class FeedForwardBlock(nn.Module):
@@ -100,7 +100,7 @@ class MultiHeadAttentionBlock(nn.Module):
         # (Batch, h, seq_len, d_k) --> (Batch, h, seq_len, seq_len)
         attention_scores = (query @ key.transpose(-2, -1)) / math.sqrt(d_k)
 
-        if mask:
+        if mask is not None:
             attention_scores.masked_fill_(mask==0, -1e9)
         
         attention_scores = attention_scores.softmax(dim = -1) # (Batch, h, seq_len, seq_len)
@@ -218,7 +218,7 @@ class ProjectionLayer(nn.Module):
 class Transformer(nn.Module):
 
     def __init__(self, encoder:Encoder, decoder:Decoder, src_embed:InputEmbeddings, tgt_embed:InputEmbeddings, src_pos:PositionalEncoding, tgt_pos:PositionalEncoding, projection_layer:ProjectionLayer) -> None:
-        super.__init__()
+        super().__init__()
 
         self.encoder = encoder
         self.decoder = decoder
