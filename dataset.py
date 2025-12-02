@@ -16,6 +16,8 @@ class BilingualDataset(Dataset):
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
 
+        # Check the tokenizer_en.json and tokenizer_it.json. The below statements fetch the id for each of the SOS, EOS, PAD tokens
+        # from this json file. 
         self.sos_token = torch.tensor([tokenizer_src.token_to_id("[SOS]")], dtype=torch.int64)
         self.eos_token = torch.tensor([tokenizer_src.token_to_id("[EOS]")], dtype=torch.int64)
         self.pad_token = torch.tensor([tokenizer_src.token_to_id("[PAD]")], dtype=torch.int64)
@@ -69,7 +71,7 @@ class BilingualDataset(Dataset):
         assert decoder_input.size(0) == self.seq_len
         assert label.size(0) == self.seq_len
 
-
+        # Need to completely understand the masking
         return {
             "encoder_input": encoder_input, # seq_len
             "decoder_input": decoder_input, # seq_len

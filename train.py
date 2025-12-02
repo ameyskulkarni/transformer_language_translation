@@ -20,6 +20,14 @@ from pathlib import Path
 from tqdm import tqdm
 
 
+'''
+Questions - 
+1. Each work will have different input IDs assigned to them. These input IDs stay constant throughout the training session.
+However, these input IDs are mapped to different input embeddings. These input embeddings are learned parameters by the model. 
+These input embeddings change as the training progresses. Hence, check if after many training iterations if the input embeddings for same words is same or different. 
+
+'''
+
 def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_len, device):
     sos_idx = tokenizer_tgt.token_to_id('[SOS]')
     eos_idx = tokenizer_tgt.token_to_id('[EOS]')
@@ -113,22 +121,27 @@ def get_or_build_tokenizer(config, ds, lang):
 
     return tokenizer
 
+def investigate_ds_raw(ds_raw):
+    print(f"type of ds_raw: {type(ds_raw)}")
+    # Preview the first entry
+    print(ds_raw[0])
 
-def get_ds(config):
-    ds_raw = load_dataset('opus_books', f"{config['lang_src']}-{config['lang_tgt']}", split='train')
+    # Display the fields in the dataset
+    print(ds_raw.column_names)
 
-    # Build tokenizers
-    tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['lang_src'])
-    tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['lang_tgt'])
+    # Access source and target translations
+    for entry in ds_raw:
+        source_text = entry['translation'][config['lang_src']]
+        target_text = entry['translation'][config['lang_tgt']]
+        print("Source:", source_text)
+        print("Target:", target_text)
 
-    # 90% train 10% val
-    train_ds_size = int(0.9 * len(ds_raw))
-    val_ds_size = len(ds_raw) - train_ds_size
-    train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
+def investigate_tokenizers(tokenizer):
+    print(f"Type of the tokenizer is: {type(tokenizer)}")
+    vocab = tokenizer.get_vocab()
+    print(vocab)  # Displays a dictionary of tokens and their IDs
 
-    train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
-    val_ds = BilingualDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
-
+def check_max_len(ds_raw, tokenizer_src, tokenizer_tgt):
     max_len_src = 0
     max_len_tgt = 0
 
@@ -140,6 +153,36 @@ def get_ds(config):
 
     print(f'Max_length of source sentence: {max_len_src}')
     print(f'Max_length of target sentence: {max_len_tgt}')
+    return max_len_src, max_len_tgt
+ 
+def get_ds(config):
+    # ds_raw is the loaded dataset. It is of the type <class 'datasets.arrow_dataset.Dataset'>. 
+    # Column names in the dataset are : `id` and `translation`. The translation column contains a dictionary that has the 
+    # en and it translations. 
+    ds_raw = load_dataset('opus_books', f"{config['lang_src']}-{config['lang_tgt']}", split='train')
+    # Call the below debug function to investigate the dataset more.
+    # investigate_ds_raw(ds_raw)
+    
+    # Build tokenizers
+    # Tokenizers below are of the type `tokenizers.Tokenizer`. Check this class out to see all its functions. 
+    # We can investigate the tokenizer more when seeing these functions. 
+    tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['lang_src'])
+    tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['lang_tgt'])
+    # investigate_tokenizers(tokenizer_src)
+    
+    # 90% train 10% val
+    train_ds_size = int(0.9 * len(ds_raw))
+    val_ds_size = len(ds_raw) - train_ds_size
+    train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
+
+    train_ds = BilingualDataset(train_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
+    val_ds = BilingualDataset(val_ds_raw, tokenizer_src, tokenizer_tgt, config['lang_src'], config['lang_tgt'], config['seq_len'])
+
+    # The below max len calc is dont just to demonstrate that the max tokens that exist in a sentence are only 350.
+    # So we go through every sentence in the dataset, encode it into tokens and then calculate the max len of the sentence. 
+    # This decides the seq_len in the BilingualDataset above. The config['seq_len'] that we have is this very number - 350. This is the max len of a sentence that is possible. 
+    # In cases where the sentence is not this big, padding is added. 
+    max_len_src, max_len_tgt = check_max_len(ds_raw, tokenizer_src, tokenizer_tgt)
 
     train_dataloader = DataLoader(train_ds, batch_size=config['batch_size'], shuffle=True)
     val_dataloader = DataLoader(val_ds, batch_size=1, shuffle=True)
